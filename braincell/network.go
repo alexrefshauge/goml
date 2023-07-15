@@ -12,6 +12,7 @@ type Network struct {
 	Activation []Mat
 	Weights    []Mat
 	Biases     []Mat
+	activationFunc func(float64) float64
 }
 
 func Sigmoid(x float64) float64 {
@@ -48,4 +49,12 @@ func NetworkNew(layers []int) Network {
 	}
 	fmt.Println("Weight/bias layers initialised!")
 	return newNetwork
+}
+
+func (m *Network) Forward(a0 Mat) {
+	//Assert size of a0/input layer
+	//Iterate layers
+
+	outputLayer := m.Activation[len(m.Activation)-1]
+ MatApply(outputLayer, m.activationFunc)
 }
