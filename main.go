@@ -195,13 +195,6 @@ func main() {
 		fmt.Printf("TEST: %v ^ %v => %v\n", model.a0.Data[0][0], model.a0.Data[0][1], model.a2.Data[0][0])
 	}
 
-	network := NetworkNew([]int{4, 5, 2})
+	network := NetworkNew([]int{2, 64 * 64, 3})
 	fmt.Printf("Network with %v layers initialised!\n", network.LayerCount)
-	MatPrint(network.Activation[0], "a0")
-	MatPrint(network.Weights[0], "w1")
-	MatPrint(network.Biases[0], "b1")
-	MatPrint(network.Activation[1], "a1")
-	MatPrint(network.Weights[1], "w2")
-	MatPrint(network.Biases[1], "b2")
-	MatPrint(network.Activation[2], "a2")
 }
