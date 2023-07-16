@@ -3,7 +3,12 @@ package main
 import (
 	"fmt"
 	. "goml/braincell"
+	"image"
+	"image/color"
+	"image/png"
+	_ "image/png"
 	"math/rand"
+	"os"
 )
 
 var trainData = [][2]int{
@@ -168,7 +173,7 @@ func main() {
 	gradient.a2 = MatNew(1, 1, Zero)
 
 	fmt.Println(cost(model, traininDataIn, traininDataOut))
-	cycles := 500000
+	cycles := 10000
 	width := 100
 	for i := 0; i < width-1; i++ {
 		if i%(width/10) == 0 {
@@ -205,4 +210,20 @@ func main() {
 		network.Forward(traininDataIn.Row(i))
 		fmt.Printf("Braincell TEST: %v ^ %v => %v\n", network.Activation[0].Data[0][0], network.Activation[0].Data[0][1], network.Activation[2].Data[0][0])
 	}
+
+	resWidth := 256
+	resHeight := 256
+	file, _ := os.Create("result.png")
+	upLeft := image.Point{0, 0}
+	lowRight := image.Point{256, 256}
+	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
+
+	for y := 0; y < resHeight; y++ {
+		for x := 0; x < resWidth; x++ {
+			var v uint8 = uint8(rand.Float64() * 255)
+			img.Set(x, y, color.RGBA{v, v, v, 255})
+		}
+	}
+
+	png.Encode(file, img)
 }
