@@ -77,10 +77,9 @@ func MatSum(a Mat, b Mat) Mat {
 }
 
 func MatApply(m *Mat, fn func(x float64) float64) {
-	mp := &m
-	for i := 0; i < mp.Rows; i++ {
+	for i := 0; i < m.Rows; i++ {
 		for j := 0; j < m.Cols; j++ {
-			mp.Data[i][j] = fn(mp.Data[i][j])
+			m.Data[i][j] = fn(m.Data[i][j])
 		}
 	}
 }

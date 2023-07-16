@@ -7,11 +7,11 @@ import (
 )
 
 type Network struct {
-	LayerCount int
-	Layout     []int
-	Activation []Mat
-	Weights    []Mat
-	Biases     []Mat
+	LayerCount     int
+	Layout         []int
+	Activation     []Mat
+	Weights        []Mat
+	Biases         []Mat
 	activationFunc func(float64) float64
 }
 
@@ -51,10 +51,21 @@ func NetworkNew(layers []int) Network {
 	return newNetwork
 }
 
-func (m *Network) Forward(a0 Mat) {
-	//Assert size of a0/input layer
-	//Iterate layers
+func (m *Network) Forward(a0 Mat) Mat {
+	//TODO:Assert size of a0/input layer
+
+	m.Activation[0] = a0
+
+	for layer := 0; layer < (len(m.Activation) - 1); layer++ {
+		a := m.Activation[layer]
+		w := m.Weights[layer]
+		b := m.Biases[layer]
+
+		m.Activation[layer+1] = MatDot(a, w)
+		m.Activation[layer+1] = MatSum(m.Activation[layer+1], b)
+		MatApply(&m.Activation[layer+1], Sigmoid)
+	}
 
 	outputLayer := m.Activation[len(m.Activation)-1]
- MatApply(outputLayer, m.activationFunc)
+	return outputLayer
 }

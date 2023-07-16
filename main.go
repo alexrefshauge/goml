@@ -45,11 +45,11 @@ type modelXOR struct {
 func forwardXOR(m *modelXOR) {
 	m.a1 = MatDot(m.a0, m.w1)
 	m.a1 = MatSum(m.a1, m.b1)
-	MatApply(m.a1, Sigmoid)
+	MatApply(&m.a1, Sigmoid)
 
 	m.a2 = MatDot(m.a1, m.w2)
 	m.a2 = MatSum(m.a2, m.b2)
-	MatApply(m.a2, Sigmoid)
+	MatApply(&m.a2, Sigmoid)
 }
 
 func finiteDiff(m *modelXOR, g *modelXOR, traininIn Mat, trainingOut Mat, eps float64) {
@@ -168,7 +168,7 @@ func main() {
 	gradient.a2 = MatNew(1, 1, Zero)
 
 	fmt.Println(cost(model, traininDataIn, traininDataOut))
-	cycles := 1000
+	cycles := 500000
 	width := 100
 	for i := 0; i < width-1; i++ {
 		if i%(width/10) == 0 {
@@ -188,13 +188,21 @@ func main() {
 	fmt.Print("\n")
 	fmt.Println(cost(model, traininDataIn, traininDataOut))
 
+	network := NetworkNew([]int{2, 2, 1})
+	network.Weights[0] = model.w1
+	network.Weights[1] = model.w2
+	network.Biases[0] = model.b1
+	network.Biases[1] = model.b2
+	fmt.Printf("Network with %v layers initialised!\n", network.LayerCount)
+
 	//test
 	for i := 0; i < traininDataIn.Rows; i++ {
 		model.a0 = traininDataIn.Row(i)
 		forwardXOR(model)
-		fmt.Printf("TEST: %v ^ %v => %v\n", model.a0.Data[0][0], model.a0.Data[0][1], model.a2.Data[0][0])
+		fmt.Printf("Main TEST: %v ^ %v => %v\n", model.a0.Data[0][0], model.a0.Data[0][1], model.a2.Data[0][0])
 	}
-
-	network := NetworkNew([]int{2, 64 * 64, 3})
-	fmt.Printf("Network with %v layers initialised!\n", network.LayerCount)
+	for i := 0; i < traininDataIn.Rows; i++ {
+		network.Forward(traininDataIn.Row(i))
+		fmt.Printf("Braincell TEST: %v ^ %v => %v\n", network.Activation[0].Data[0][0], network.Activation[0].Data[0][1], network.Activation[2].Data[0][0])
+	}
 }
