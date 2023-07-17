@@ -172,33 +172,18 @@ func main() {
 	gradient.b2 = MatNew(1, 1, Zero)
 	gradient.a2 = MatNew(1, 1, Zero)
 
-	fmt.Println(cost(model, traininDataIn, traininDataOut))
-	cycles := 100000
-	width := 100
-	for i := 0; i < width-1; i++ {
-		if i%(width/10) == 0 {
-			fmt.Print("I")
-		} else {
-			fmt.Print(".")
-		}
-	}
-	fmt.Print("I\n")
+	cycles := 100
 	for i := 0; i < cycles; i++ {
 		finiteDiff(model, gradient, traininDataIn, traininDataOut, eps)
 		learn(model, gradient, learningRate)
-		if i%(cycles/width) == 0 {
-			fmt.Print("█")
-		}
 	}
-	fmt.Print("\n")
-	fmt.Println(cost(model, traininDataIn, traininDataOut))
 
 	network := NetworkNew([]int{2, 2, 1})
-	network.Weights[0] = model.w1
-	network.Weights[1] = model.w2
-	network.Biases[0] = model.b1
-	network.Biases[1] = model.b2
-	fmt.Printf("Network with %v layers initialised!\n", network.LayerCount)
+	for i := 0; i < cycles; i++ {
+		network.FiniteDiff(traininDataIn, traininDataOut, eps, learningRate)
+	}
+	MatPrint(network.Biases[0], "")
+	MatPrint(network.Biases[1], "")
 
 	//test
 	for i := 0; i < traininDataIn.Rows; i++ {

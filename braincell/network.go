@@ -1,7 +1,6 @@
 package braincell
 
 import (
-	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -48,7 +47,6 @@ func NetworkNew(layers []int) Network {
 		newNetwork.Weights[layer] = MatNew(prevActivationLayer.Cols, nextActivationLayer.Cols, rand.Float64)
 		newNetwork.Biases[layer] = MatNew(1, nextActivationLayer.Cols, rand.Float64)
 	}
-	fmt.Println("Weight/bias layers initialised!")
 	return newNetwork
 }
 
@@ -93,17 +91,17 @@ func (network *Network) Cost(trainIn Mat, trainOut Mat) float64 {
 	return cost
 }
 
-func (network *Network) finiteDiff(trainIn Mat, trainOut Mat, eps float64) {
+func (network *Network) FiniteDiff(trainIn Mat, trainOut Mat, eps float64, rate float64) {
 	var saved float64
 	gradient := NetworkNew(network.Layout)
 	oldCost := network.Cost(trainIn, trainOut)
 
-	for layer := 0; layer < network.LayerCount; layer++ {
+	for layer := 0; layer < (network.LayerCount - 1); layer++ {
 		for i := 0; i < network.Weights[layer].Rows; i++ {
 			for j := 0; j < network.Weights[layer].Cols; j++ {
 				saved = network.Weights[layer].Data[i][j]
 				network.Weights[layer].Data[i][j] += eps
-				gradient.Biases[layer].Data[i][j] = (network.Cost(trainIn, trainOut) - oldCost) / eps
+				gradient.Weights[layer].Data[i][j] = (network.Cost(trainIn, trainOut) - oldCost) / eps
 				network.Weights[layer].Data[i][j] = saved
 			}
 		}
@@ -116,4 +114,18 @@ func (network *Network) finiteDiff(trainIn Mat, trainOut Mat, eps float64) {
 			}
 		}
 	}
+
+	for layer := 0; layer < (network.LayerCount - 1); layer++ {
+		for i := 0; i < network.Weights[layer].Rows; i++ {
+			for j := 0; j < network.Weights[layer].Cols; j++ {
+				network.Weights[layer].Data[i][j] -= rate * gradient.Weights[layer].Data[i][j]
+			}
+		}
+		for i := 0; i < network.Biases[layer].Rows; i++ {
+			for j := 0; j < network.Biases[layer].Cols; j++ {
+				network.Biases[layer].Data[i][j] -= rate * gradient.Biases[layer].Data[i][j]
+			}
+		}
+	}
+
 }
