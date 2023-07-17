@@ -2,6 +2,7 @@ package braincell
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 )
@@ -21,7 +22,7 @@ func Sigmoid(x float64) float64 {
 
 func (n Network) validate() {
 	if len(n.Weights) != len(n.Biases) {
-		return
+		log.Fatal("Error:")
 	}
 }
 
@@ -68,4 +69,51 @@ func (m *Network) Forward(a0 Mat) Mat {
 
 	outputLayer := m.Activation[len(m.Activation)-1]
 	return outputLayer
+}
+
+func (network *Network) Cost(trainIn Mat, trainOut Mat) float64 {
+	if trainIn.Rows != trainOut.Rows {
+		log.Fatal("Rows of training input is not equivalent to rows of training output")
+	}
+
+	var cost float64 = 0
+	for sample := 0; sample < trainIn.Rows; sample++ {
+		network.Forward(trainIn.Row(sample))
+		var expected Mat = trainOut.Row(sample)
+		outputLayer := network.Activation[network.LayerCount-1]
+		var got Mat = outputLayer
+		MatApply(&got, func(x float64) float64 { return (x * -1) })
+		residualMat := MatSum(expected, got)
+		var residual float64 = 0
+		for entry := 0; entry < residualMat.Cols; entry++ {
+			residual += residualMat.Data[0][entry]
+		}
+		cost += residual * residual
+	}
+	return cost
+}
+
+func (network *Network) finiteDiff(trainIn Mat, trainOut Mat, eps float64) {
+	var saved float64
+	gradient := NetworkNew(network.Layout)
+	oldCost := network.Cost(trainIn, trainOut)
+
+	for layer := 0; layer < network.LayerCount; layer++ {
+		for i := 0; i < network.Weights[layer].Rows; i++ {
+			for j := 0; j < network.Weights[layer].Cols; j++ {
+				saved = network.Weights[layer].Data[i][j]
+				network.Weights[layer].Data[i][j] += eps
+				gradient.Biases[layer].Data[i][j] = (network.Cost(trainIn, trainOut) - oldCost) / eps
+				network.Weights[layer].Data[i][j] = saved
+			}
+		}
+		for i := 0; i < network.Biases[layer].Rows; i++ {
+			for j := 0; j < network.Biases[layer].Cols; j++ {
+				saved = network.Biases[layer].Data[i][j]
+				network.Biases[layer].Data[i][j] += eps
+				gradient.Biases[layer].Data[i][j] = (network.Cost(trainIn, trainOut) - oldCost) / eps
+				network.Biases[layer].Data[i][j] = saved
+			}
+		}
+	}
 }

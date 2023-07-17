@@ -173,7 +173,7 @@ func main() {
 	gradient.a2 = MatNew(1, 1, Zero)
 
 	fmt.Println(cost(model, traininDataIn, traininDataOut))
-	cycles := 10000
+	cycles := 100000
 	width := 100
 	for i := 0; i < width-1; i++ {
 		if i%(width/10) == 0 {
@@ -220,10 +220,22 @@ func main() {
 
 	for y := 0; y < resHeight; y++ {
 		for x := 0; x < resWidth; x++ {
-			var v uint8 = uint8(rand.Float64() * 255)
+			var v uint8 = 255 //uint8(rand.Float64() * 255)
 			img.Set(x, y, color.RGBA{v, v, v, 255})
 		}
 	}
 
+	for layer := 0; layer < (network.LayerCount - 1); layer++ {
+		for y := 0; y < network.Weights[layer].Rows; y++ {
+			for x := 0; x < network.Weights[layer].Cols; x++ {
+				var v uint8 = uint8(network.Weights[layer].Data[y][x] * 255)
+				img.Set(x, y+(layer*8), color.RGBA{v, v, v, 255})
+			}
+		}
+	}
+
 	png.Encode(file, img)
+
+	fmt.Println(cost(model, traininDataIn, traininDataOut))
+	fmt.Println(network.Cost(traininDataIn, traininDataOut))
 }
