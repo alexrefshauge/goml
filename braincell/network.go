@@ -1,6 +1,7 @@
 package braincell
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"math/rand"
@@ -110,16 +111,18 @@ func (network *Network) Cost(trainIn Mat, trainOut Mat) float64 {
 	return cost
 }
 
-func (network *Network) Adjust(gradient Network, rate float64) {
+func (network *Network) Adjust(gradient *Network, rate float64) {
 	for layer := 0; layer < (network.LayerCount - 1); layer++ {
 		for i := 0; i < gradient.Weights[layer].Rows; i++ {
 			for j := 0; j < gradient.Weights[layer].Cols; j++ {
-				gradient.Weights[layer].Data[i][j] *= -1 * rate
+				gradient.Weights[layer].Data[i][j] *= rate
+				gradient.Weights[layer].Data[i][j] *= -1
 			}
 		}
 		for i := 0; i < gradient.Biases[layer].Rows; i++ {
 			for j := 0; j < gradient.Biases[layer].Cols; j++ {
-				gradient.Biases[layer].Data[i][j] *= -1 * rate
+				gradient.Biases[layer].Data[i][j] *= rate
+				gradient.Biases[layer].Data[i][j] *= -1
 			}
 		}
 		network.Weights[layer] = MatSum(network.Weights[layer], gradient.Weights[layer])
@@ -166,12 +169,18 @@ func (network *Network) FiniteDiff(trainIn Mat, trainOut Mat, eps float64, rate 
 
 }
 
-func (network *Network) Backprop(trainIn Mat, trainOut Mat, rate float64) {
+func (network *Network) Backprop(gradient *Network, trainIn Mat, trainOut Mat, rate float64) {
 	sampleCount := trainIn.Rows
-	gradient := NetworkNewZero(network.Layout)
 	//TODO: initialise to zero
 
 	for sample := 0; sample < int(sampleCount); sample++ {
+		for layer := 0; layer < (gradient.LayerCount); layer++ {
+			MatFill(&gradient.Activation[layer], 0)
+		}
+		for layer := 0; layer < (gradient.LayerCount - 1); layer++ {
+			MatFill(&gradient.Biases[layer], 0)
+			MatFill(&gradient.Weights[layer], 0)
+		}
 		network.Forward(trainIn.Row(sample))
 		for i := 0; i < trainOut.Cols; i++ {
 			gradient.Activation[len(gradient.Activation)-1].Data[0][i] = network.Activation[len(gradient.Activation)-1].Data[0][i] - trainOut.Data[sample][i]
@@ -205,4 +214,13 @@ func (network *Network) Backprop(trainIn Mat, trainOut Mat, rate float64) {
 		}
 	}
 	network.Adjust(gradient, rate)
+}
+
+func NetworkPrint(network *Network) {
+	for layer := 0; layer < (network.LayerCount - 1); layer++ {
+		MatPrint(network.Activation[layer], fmt.Sprintf("Activationlayer %d", (layer+1)))
+		MatPrint(network.Weights[layer], fmt.Sprintf("Weightlayer %d", (layer+1)))
+		MatPrint(network.Biases[layer], fmt.Sprintf("Biaslayer %d", (layer+1)))
+	}
+	MatPrint(network.Activation[len(network.Activation)-1], "Output layer")
 }

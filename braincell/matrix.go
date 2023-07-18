@@ -84,6 +84,14 @@ func MatApply(m *Mat, fn func(x float64) float64) {
 	}
 }
 
+func MatFill(m *Mat, value float64) {
+	for i := 0; i < m.Rows; i++ {
+		for j := 0; j < m.Cols; j++ {
+			m.Data[i][j] = value
+		}
+	}
+}
+
 // Prints a matrix
 func MatPrint(m Mat, label string) {
 	fmt.Printf("[ %s\n", label)

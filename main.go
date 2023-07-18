@@ -31,7 +31,7 @@ func main() {
 	// 	log.Fatal("Error!: Failed to read image")
 	// }
 
-	cycles := 100
+	cycles := 10000
 	//network := NetworkNew([]int{2, 3, 3})
 
 	//TEST
@@ -39,15 +39,17 @@ func main() {
 	trainingDataIn := Mat{Rows: 4, Cols: 2, Data: [][]float64{{0, 0}, {1, 0}, {0, 1}, {1, 1}}}
 	trainingDataOut := Mat{Rows: 4, Cols: 1, Data: [][]float64{{0}, {1}, {1}, {0}}}
 
+	gradient := NetworkNewZero(networkXor.Layout)
+	// networkXor.Backprop(&gradient, trainingDataIn, trainingDataOut, 1)
+
 	for i := 0; i < cycles; i++ {
-		networkXor.Backprop(trainingDataIn, trainingDataOut, 0.02)
-		// fmt.Println("\t\t", i, "\t", networkXor.Cost(trainingDataIn, trainingDataOut))
-		fmt.Println("0 ^ 0 : ", networkXor.Forward(trainingDataIn.Row(0)).Data[0][0])
-		fmt.Println("1 ^ 0 : ", networkXor.Forward(trainingDataIn.Row(1)).Data[0][0])
-		fmt.Println("0 ^ 1 : ", networkXor.Forward(trainingDataIn.Row(2)).Data[0][0])
-		fmt.Println("1 ^ 1 : ", networkXor.Forward(trainingDataIn.Row(3)).Data[0][0])
-		fmt.Println("")
+		networkXor.Backprop(&gradient, trainingDataIn, trainingDataOut, 0.02)
+		fmt.Println("\t\t", i, "\t", networkXor.Cost(trainingDataIn, trainingDataOut))
 	}
+	fmt.Println("0 ^ 0 : ", networkXor.Forward(trainingDataIn.Row(0)).Data[0][0])
+	fmt.Println("1 ^ 0 : ", networkXor.Forward(trainingDataIn.Row(1)).Data[0][0])
+	fmt.Println("0 ^ 1 : ", networkXor.Forward(trainingDataIn.Row(2)).Data[0][0])
+	fmt.Println("1 ^ 1 : ", networkXor.Forward(trainingDataIn.Row(3)).Data[0][0])
 	//TESTEND
 
 	// trainingDataIn := MatNew(12*12, 2, func() float64 { return 0 })
