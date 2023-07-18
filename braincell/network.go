@@ -20,6 +20,10 @@ func Sigmoid(x float64) float64 {
 	return 1.0 / (1.0 + math.Exp(-x))
 }
 
+func ReLU(x float64) float64 {
+	return math.Max(0, x)
+}
+
 func (n Network) validate() {
 	if len(n.Weights) != len(n.Biases) {
 		log.Fatal("Error:")
@@ -82,7 +86,7 @@ func (m *Network) Forward(a0 Mat) Mat {
 
 		m.Activation[layer+1] = MatDot(a, w)
 		m.Activation[layer+1] = MatSum(m.Activation[layer+1], b)
-		MatApply(&m.Activation[layer+1], Sigmoid)
+		MatApply(&m.Activation[layer+1], ReLU)
 	}
 
 	outputLayer := m.Activation[len(m.Activation)-1]
