@@ -49,6 +49,25 @@ func NetworkNew(layers []int) Network {
 	}
 	return newNetwork
 }
+func NetworkNewZero(layers []int) Network {
+	layerCount := len(layers)
+	newNetwork := Network{LayerCount: layerCount, Layout: layers}
+	newNetwork.Activation = make([]Mat, layerCount)
+	newNetwork.Weights = make([]Mat, layerCount-1)
+	newNetwork.Biases = make([]Mat, layerCount-1)
+	//Initialise activation layers
+	for layer := 0; layer < layerCount; layer++ {
+		newNetwork.Activation[layer] = MatNew(1, layers[layer], Zero)
+	}
+	//Initialise weights and biases
+	for layer := 0; layer < (layerCount - 1); layer++ {
+		prevActivationLayer := &newNetwork.Activation[layer]
+		nextActivationLayer := &newNetwork.Activation[layer+1]
+		newNetwork.Weights[layer] = MatNew(prevActivationLayer.Cols, nextActivationLayer.Cols, Zero)
+		newNetwork.Biases[layer] = MatNew(1, nextActivationLayer.Cols, Zero)
+	}
+	return newNetwork
+}
 
 func (m *Network) Forward(a0 Mat) Mat {
 	//TODO:Assert size of a0/input layer
@@ -91,6 +110,23 @@ func (network *Network) Cost(trainIn Mat, trainOut Mat) float64 {
 	return cost
 }
 
+func (network *Network) Adjust(gradient Network, rate float64) {
+	for layer := 0; layer < (network.LayerCount - 1); layer++ {
+		for i := 0; i < gradient.Weights[layer].Rows; i++ {
+			for j := 0; j < gradient.Weights[layer].Cols; j++ {
+				gradient.Weights[layer].Data[i][j] *= -1 * rate
+			}
+		}
+		for i := 0; i < gradient.Biases[layer].Rows; i++ {
+			for j := 0; j < gradient.Biases[layer].Cols; j++ {
+				gradient.Biases[layer].Data[i][j] *= -1 * rate
+			}
+		}
+		network.Weights[layer] = MatSum(network.Weights[layer], gradient.Weights[layer])
+		network.Biases[layer] = MatSum(network.Biases[layer], gradient.Biases[layer])
+	}
+}
+
 func (network *Network) FiniteDiff(trainIn Mat, trainOut Mat, eps float64, rate float64) {
 	var saved float64
 	gradient := NetworkNew(network.Layout)
@@ -128,4 +164,45 @@ func (network *Network) FiniteDiff(trainIn Mat, trainOut Mat, eps float64, rate 
 		}
 	}
 
+}
+
+func (network *Network) Backprop(trainIn Mat, trainOut Mat, rate float64) {
+	sampleCount := trainIn.Rows
+	gradient := NetworkNewZero(network.Layout)
+	//TODO: initialise to zero
+
+	for sample := 0; sample < int(sampleCount); sample++ {
+		network.Forward(trainIn.Row(sample))
+		for i := 0; i < trainOut.Cols; i++ {
+			gradient.Activation[len(gradient.Activation)-1].Data[0][i] = network.Activation[len(gradient.Activation)-1].Data[0][i] - trainOut.Data[sample][i]
+		}
+
+		for layer := (network.LayerCount - 1); layer > 0; layer-- {
+			for j := 0; j < network.Activation[layer].Cols; j++ {
+				var a float64 = network.Activation[layer].Data[0][j]
+				var da float64 = gradient.Activation[layer].Data[0][j]
+				gradient.Biases[layer-1].Data[0][j] += 2 * da * a * (1 - a)
+				for k := 0; k < network.Activation[layer-1].Cols; k++ {
+					var pa float64 = network.Activation[layer-1].Data[0][k]
+					var w float64 = network.Weights[layer-1].Data[k][j]
+					gradient.Weights[layer-1].Data[k][j] += 2 * da * a * (1 - a) * pa
+					gradient.Activation[layer-1].Data[0][k] += 2 * da * a * (1 - a) * w
+				}
+			}
+		}
+	}
+
+	for i := 0; i < (gradient.LayerCount - 1); i++ {
+		for j := 0; j < gradient.Weights[i].Rows; j++ {
+			for k := 0; k < gradient.Weights[i].Cols; k++ {
+				gradient.Weights[i].Data[j][k] /= float64(sampleCount)
+			}
+		}
+		for j := 0; j < gradient.Biases[i].Rows; j++ {
+			for k := 0; k < gradient.Biases[i].Cols; k++ {
+				gradient.Biases[i].Data[j][k] /= float64(sampleCount)
+			}
+		}
+	}
+	network.Adjust(gradient, rate)
 }

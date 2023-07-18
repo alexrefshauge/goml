@@ -3,12 +3,8 @@ package main
 import (
 	"fmt"
 	. "goml/braincell"
-	"image"
-	"image/color"
-	"image/png"
 	_ "image/png"
 	"math/rand"
-	"os"
 )
 
 var trainData = [][2]int{
@@ -23,204 +19,82 @@ var trainCount = len(trainData)
 const eps = 1e-3
 const learningRate = 1e-3
 
-func model(x float64, w float64) float64 {
-	return x * w
-}
-
-// func cost(w float64) float64 {
-// 	var error float64 = 0
-// 	for i := 0; i < trainCount; i++ {
-// 		var x float64 = float64(trainData[i][0])
-// 		var y float64 = model(x, w)
-// 		var residual float64 = y - float64(trainData[i][1])
-// 		error += residual * residual
-// 		// fmt.Printf("got: %v - expected: %v\n", y, trainData[i][1])
-// 	}
-
-// 	var avgError float64 = error / float64(trainCount)
-// 	return avgError
-// }
-
-type modelXOR struct {
-	a0         Mat
-	w1, b1, a1 Mat
-	w2, b2, a2 Mat
-}
-
-func forwardXOR(m *modelXOR) {
-	m.a1 = MatDot(m.a0, m.w1)
-	m.a1 = MatSum(m.a1, m.b1)
-	MatApply(&m.a1, Sigmoid)
-
-	m.a2 = MatDot(m.a1, m.w2)
-	m.a2 = MatSum(m.a2, m.b2)
-	MatApply(&m.a2, Sigmoid)
-}
-
-func finiteDiff(m *modelXOR, g *modelXOR, traininIn Mat, trainingOut Mat, eps float64) {
-	var saved float64
-	oldCost := cost(m, traininIn, trainingOut)
-
-	for i := 0; i < m.w1.Rows; i++ {
-		for j := 0; j < m.w1.Cols; j++ {
-			saved = m.w1.Data[i][j]
-			m.w1.Data[i][j] += eps
-			g.w1.Data[i][j] = (cost(m, traininIn, trainingOut) - oldCost) / eps
-			m.w1.Data[i][j] = saved
-		}
-	}
-	for i := 0; i < m.w2.Rows; i++ {
-		for j := 0; j < m.w2.Cols; j++ {
-			saved = m.w2.Data[i][j]
-			m.w2.Data[i][j] += eps
-			g.w2.Data[i][j] = (cost(m, traininIn, trainingOut) - oldCost) / eps
-			m.w2.Data[i][j] = saved
-		}
-	}
-	for i := 0; i < m.b1.Rows; i++ {
-		for j := 0; j < m.b1.Cols; j++ {
-			saved = m.b1.Data[i][j]
-			m.b1.Data[i][j] += eps
-			g.b1.Data[i][j] = (cost(m, traininIn, trainingOut) - oldCost) / eps
-			m.b1.Data[i][j] = saved
-		}
-	}
-	for i := 0; i < m.b2.Rows; i++ {
-		for j := 0; j < m.b2.Cols; j++ {
-			saved = m.b2.Data[i][j]
-			m.b2.Data[i][j] += eps
-			g.b2.Data[i][j] = (cost(m, traininIn, trainingOut) - oldCost) / eps
-			m.b2.Data[i][j] = saved
-		}
-	}
-}
-
-func learn(m *modelXOR, g *modelXOR, rate float64) {
-	for i := 0; i < m.w1.Rows; i++ {
-		for j := 0; j < m.w1.Cols; j++ {
-			m.w1.Data[i][j] -= rate * g.w1.Data[i][j]
-		}
-	}
-	for i := 0; i < m.w2.Rows; i++ {
-		for j := 0; j < m.w2.Cols; j++ {
-			m.w2.Data[i][j] -= rate * g.w2.Data[i][j]
-		}
-	}
-	for i := 0; i < m.b1.Rows; i++ {
-		for j := 0; j < m.b1.Cols; j++ {
-			m.b1.Data[i][j] -= rate * g.b1.Data[i][j]
-		}
-	}
-	for i := 0; i < m.b2.Rows; i++ {
-		for j := 0; j < m.b2.Cols; j++ {
-			m.b2.Data[i][j] -= rate * g.b2.Data[i][j]
-		}
-	}
-}
-
-func cost(m *modelXOR, traininIn Mat, trainingOut Mat) float64 {
-	if traininIn.Cols == trainingOut.Cols {
-		panic(0)
-	}
-
-	var cost float64 = 0
-
-	for sample := 0; sample < traininIn.Rows; sample++ {
-		m.a0 = traininIn.Row(sample)
-		forwardXOR(m)
-		var expected float64 = trainingOut.Data[sample][0]
-		var got float64 = m.a2.Data[0][0]
-		residual := expected - got
-		cost += residual * residual
-	}
-
-	return cost
-}
-
 func main() {
-	var eps float64 = 1e-3
-	var learningRate float64 = 1e-1
+	// var eps float64 = 1e-3
+	// var learningRate float64 = 1e-1
 
-	rand.Seed(69420)
+	rand.Seed(69)
 
-	var traininDataIn Mat = Mat{Rows: 4, Cols: 2, Data: [][]float64{{0, 0}, {1, 0}, {0, 1}, {1, 1}}}
-	var traininDataOut Mat = Mat{Rows: 4, Cols: 1, Data: [][]float64{{0}, {1}, {1}, {0}}}
-
-	//input
-	x := MatNew(1, 2, Zero)
-	x.Data = [][]float64{{1, 1}}
-
-	var model *modelXOR = new(modelXOR)
-	var gradient *modelXOR = new(modelXOR)
-
-	//layers
-	model.a0 = MatNew(1, 2, Zero)
-	model.w1 = MatNew(2, 2, rand.Float64)
-	model.b1 = MatNew(1, 2, rand.Float64)
-	model.a1 = MatNew(1, 2, Zero)
-	model.w2 = MatNew(2, 1, rand.Float64)
-	model.b2 = MatNew(1, 1, rand.Float64)
-	model.a2 = MatNew(1, 1, Zero)
-	//a2 := MatNew(1, 1, zero)
-
-	//arbitary gradient matrix
-	gradient.a0 = MatNew(1, 2, Zero)
-	gradient.w1 = MatNew(2, 2, Zero)
-	gradient.b1 = MatNew(1, 2, Zero)
-	gradient.a1 = MatNew(1, 2, Zero)
-	gradient.w2 = MatNew(2, 1, Zero)
-	gradient.b2 = MatNew(1, 1, Zero)
-	gradient.a2 = MatNew(1, 1, Zero)
+	// appleTrain64, err := os.Open("./datasets/apple_12.png")
+	// trainingData, err := png.Decode(appleTrain64)
+	// if err != nil {
+	// 	log.Fatal("Error!: Failed to read image")
+	// }
 
 	cycles := 100
+	//network := NetworkNew([]int{2, 3, 3})
+
+	//TEST
+	networkXor := NetworkNew([]int{2, 2, 1})
+	trainingDataIn := Mat{Rows: 4, Cols: 2, Data: [][]float64{{0, 0}, {1, 0}, {0, 1}, {1, 1}}}
+	trainingDataOut := Mat{Rows: 4, Cols: 1, Data: [][]float64{{0}, {1}, {1}, {0}}}
+
 	for i := 0; i < cycles; i++ {
-		finiteDiff(model, gradient, traininDataIn, traininDataOut, eps)
-		learn(model, gradient, learningRate)
+		networkXor.Backprop(trainingDataIn, trainingDataOut, 0.02)
+		// fmt.Println("\t\t", i, "\t", networkXor.Cost(trainingDataIn, trainingDataOut))
+		fmt.Println("0 ^ 0 : ", networkXor.Forward(trainingDataIn.Row(0)).Data[0][0])
+		fmt.Println("1 ^ 0 : ", networkXor.Forward(trainingDataIn.Row(1)).Data[0][0])
+		fmt.Println("0 ^ 1 : ", networkXor.Forward(trainingDataIn.Row(2)).Data[0][0])
+		fmt.Println("1 ^ 1 : ", networkXor.Forward(trainingDataIn.Row(3)).Data[0][0])
+		fmt.Println("")
 	}
+	//TESTEND
 
-	network := NetworkNew([]int{2, 2, 1})
-	for i := 0; i < cycles; i++ {
-		network.FiniteDiff(traininDataIn, traininDataOut, eps, learningRate)
-	}
-	MatPrint(network.Biases[0], "")
-	MatPrint(network.Biases[1], "")
+	// trainingDataIn := MatNew(12*12, 2, func() float64 { return 0 })
+	// trainingDataOut := MatNew(12*12, 3, func() float64 { return 0 })
+	// for y := 0; y < 12; y++ {
+	// 	for x := 0; x < 12; x++ {
+	// 		trainingDataIn.Data[y*x+x][0] = float64(x)
+	// 		trainingDataIn.Data[y*x+x][1] = float64(y)
 
-	//test
-	for i := 0; i < traininDataIn.Rows; i++ {
-		model.a0 = traininDataIn.Row(i)
-		forwardXOR(model)
-		fmt.Printf("Main TEST: %v ^ %v => %v\n", model.a0.Data[0][0], model.a0.Data[0][1], model.a2.Data[0][0])
-	}
-	for i := 0; i < traininDataIn.Rows; i++ {
-		network.Forward(traininDataIn.Row(i))
-		fmt.Printf("Braincell TEST: %v ^ %v => %v\n", network.Activation[0].Data[0][0], network.Activation[0].Data[0][1], network.Activation[2].Data[0][0])
-	}
+	// 		pixel := trainingData.At(x, y)
+	// 		r, g, b, _ := pixel.RGBA()
+	// 		col := []float64{float64(r>>8) / 255, float64(g>>8) / 255, float64(b>>8) / 255}
+	// 		trainingDataOut.Data[y*x+x] = col
+	// 		trainingDataIn.Data[y*x+x] = []float64{float64(x) / 64, float64(y) / 64}
+	// 	}
+	// }
 
-	resWidth := 256
-	resHeight := 256
-	file, _ := os.Create("result.png")
-	upLeft := image.Point{0, 0}
-	lowRight := image.Point{256, 256}
-	img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
+	// for i := 0; i < cycles; i++ {
+	// 	fmt.Println("cycle", i)
+	// 	network.FiniteDiff(trainingDataIn, trainingDataOut, eps, learningRate)
+	// }
 
-	for y := 0; y < resHeight; y++ {
-		for x := 0; x < resWidth; x++ {
-			var v uint8 = 255 //uint8(rand.Float64() * 255)
-			img.Set(x, y, color.RGBA{v, v, v, 255})
-		}
-	}
+	// resWidth := 12
+	// resHeight := 12
+	// file, _ := os.Create("result.png")
+	// upLeft := image.Point{0, 0}
+	// lowRight := image.Point{resWidth, resHeight}
+	// img := image.NewRGBA(image.Rectangle{upLeft, lowRight})
 
-	for layer := 0; layer < (network.LayerCount - 1); layer++ {
-		for y := 0; y < network.Weights[layer].Rows; y++ {
-			for x := 0; x < network.Weights[layer].Cols; x++ {
-				var v uint8 = uint8(network.Weights[layer].Data[y][x] * 255)
-				img.Set(x, y+(layer*8), color.RGBA{v, v, v, 255})
-			}
-		}
-	}
+	// for y := 0; y < resHeight; y++ {
+	// 	for x := 0; x < resWidth; x++ {
+	// 		input := MatNew(1, 2, Zero)
+	// 		input.Data[0][0] = float64(x) / float64(resWidth)
+	// 		input.Data[0][1] = float64(y) / float64(resHeight)
+	// 		network.Forward(input)
+	// 		output := network.Activation[len(network.Activation)-1]
+	// 		col := output.Data[0]
+	// 		fmt.Println(input.Data[0][0], input.Data[0][1])
+	// 		fmt.Println(output.Data[0][0], output.Data[0][1], output.Data[0][2])
+	// 		r := uint8(col[0] * 255)
+	// 		g := uint8(col[1] * 255)
+	// 		b := uint8(col[2] * 255)
+	// 		fmt.Println(r, g, b)
+	// 		img.Set(x, y, color.RGBA{r, g, b, 255})
+	// 	}
+	// }
 
-	png.Encode(file, img)
-
-	fmt.Println(cost(model, traininDataIn, traininDataOut))
-	fmt.Println(network.Cost(traininDataIn, traininDataOut))
+	// png.Encode(file, img)
+	// fmt.Println(network.Cost(traininDataIn, traininDataOut))
 }

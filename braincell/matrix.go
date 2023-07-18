@@ -89,7 +89,7 @@ func MatPrint(m Mat, label string) {
 	fmt.Printf("[ %s\n", label)
 	for row := 0; row < m.Rows; row++ {
 		for col := 0; col < m.Cols; col++ {
-			fmt.Printf("%5.2f ", m.Data[row][col])
+			fmt.Printf("%5.2f", m.Data[row][col])
 		}
 		fmt.Printf("\n")
 	}
