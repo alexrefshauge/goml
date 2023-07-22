@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"math/rand"
 )
 
 type Network struct {
@@ -13,7 +12,12 @@ type Network struct {
 	Activation     []Mat
 	Weights        []Mat
 	Biases         []Mat
-	activationFunc func(float64) float64
+	ActivationFunc []func(float64) float64
+}
+
+type Layer struct {
+	NeuronCount    int
+	ActivationFunc func(x float64) float64
 }
 
 func Sigmoid(x float64) float64 {
@@ -21,7 +25,11 @@ func Sigmoid(x float64) float64 {
 }
 
 func ReLU(x float64) float64 {
-	return math.Max(0, x)
+	return math.Max(0.0, x)
+}
+
+func GELU(x float64) float64 {
+	return 0.5 * x * (1 + math.Erf(x/math.Sqrt(2)))
 }
 
 func (n Network) validate() {
@@ -35,42 +43,28 @@ Initialise a new neural network
 
 layers indicates the amiunt of neurons in each layer
 */
-func NetworkNew(layers []int) Network {
+func NetworkNew(layers []Layer, biasInitialiser func() float64, weightInitialiser func() float64) Network {
 	layerCount := len(layers)
-	newNetwork := Network{LayerCount: layerCount, Layout: layers}
+	newNetwork := Network{LayerCount: layerCount}
+	newNetwork.Layout = make([]int, layerCount)
+	newNetwork.ActivationFunc = make([]func(float64) float64, layerCount)
 	newNetwork.Activation = make([]Mat, layerCount)
 	newNetwork.Weights = make([]Mat, layerCount-1)
 	newNetwork.Biases = make([]Mat, layerCount-1)
 	//Initialise activation layers
 	for layer := 0; layer < layerCount; layer++ {
-		newNetwork.Activation[layer] = MatNew(1, layers[layer], Zero)
+		newNetwork.Layout[layer] = layers[layer].NeuronCount
+		newNetwork.ActivationFunc[layer] = layers[layer].ActivationFunc
+		newNetwork.Activation[layer] = MatNew(1, newNetwork.Layout[layer], Zero)
 	}
 	//Initialise weights and biases
 	for layer := 0; layer < (layerCount - 1); layer++ {
 		prevActivationLayer := &newNetwork.Activation[layer]
 		nextActivationLayer := &newNetwork.Activation[layer+1]
-		newNetwork.Weights[layer] = MatNew(prevActivationLayer.Cols, nextActivationLayer.Cols, rand.Float64)
-		newNetwork.Biases[layer] = MatNew(1, nextActivationLayer.Cols, rand.Float64)
+		newNetwork.Weights[layer] = MatNew(prevActivationLayer.Cols, nextActivationLayer.Cols, weightInitialiser)
+		newNetwork.Biases[layer] = MatNew(1, nextActivationLayer.Cols, biasInitialiser)
 	}
-	return newNetwork
-}
-func NetworkNewZero(layers []int) Network {
-	layerCount := len(layers)
-	newNetwork := Network{LayerCount: layerCount, Layout: layers}
-	newNetwork.Activation = make([]Mat, layerCount)
-	newNetwork.Weights = make([]Mat, layerCount-1)
-	newNetwork.Biases = make([]Mat, layerCount-1)
-	//Initialise activation layers
-	for layer := 0; layer < layerCount; layer++ {
-		newNetwork.Activation[layer] = MatNew(1, layers[layer], Zero)
-	}
-	//Initialise weights and biases
-	for layer := 0; layer < (layerCount - 1); layer++ {
-		prevActivationLayer := &newNetwork.Activation[layer]
-		nextActivationLayer := &newNetwork.Activation[layer+1]
-		newNetwork.Weights[layer] = MatNew(prevActivationLayer.Cols, nextActivationLayer.Cols, Zero)
-		newNetwork.Biases[layer] = MatNew(1, nextActivationLayer.Cols, Zero)
-	}
+
 	return newNetwork
 }
 
@@ -86,7 +80,7 @@ func (m *Network) Forward(a0 Mat) Mat {
 
 		m.Activation[layer+1] = MatDot(a, w)
 		m.Activation[layer+1] = MatSum(m.Activation[layer+1], b)
-		MatApply(&m.Activation[layer+1], ReLU)
+		MatApply(&m.Activation[layer+1], GELU)
 	}
 
 	outputLayer := m.Activation[len(m.Activation)-1]
@@ -119,14 +113,12 @@ func (network *Network) Adjust(gradient *Network, rate float64) {
 	for layer := 0; layer < (network.LayerCount - 1); layer++ {
 		for i := 0; i < gradient.Weights[layer].Rows; i++ {
 			for j := 0; j < gradient.Weights[layer].Cols; j++ {
-				gradient.Weights[layer].Data[i][j] *= rate
-				gradient.Weights[layer].Data[i][j] *= -1
+				gradient.Weights[layer].Data[i][j] *= rate * -1
 			}
 		}
 		for i := 0; i < gradient.Biases[layer].Rows; i++ {
 			for j := 0; j < gradient.Biases[layer].Cols; j++ {
-				gradient.Biases[layer].Data[i][j] *= rate
-				gradient.Biases[layer].Data[i][j] *= -1
+				gradient.Biases[layer].Data[i][j] *= rate * -1
 			}
 		}
 		network.Weights[layer] = MatSum(network.Weights[layer], gradient.Weights[layer])
@@ -134,60 +126,34 @@ func (network *Network) Adjust(gradient *Network, rate float64) {
 	}
 }
 
-func (network *Network) FiniteDiff(trainIn Mat, trainOut Mat, eps float64, rate float64) {
-	var saved float64
-	gradient := NetworkNew(network.Layout)
-	oldCost := network.Cost(trainIn, trainOut)
-
-	for layer := 0; layer < (network.LayerCount - 1); layer++ {
-		for i := 0; i < network.Weights[layer].Rows; i++ {
-			for j := 0; j < network.Weights[layer].Cols; j++ {
-				saved = network.Weights[layer].Data[i][j]
-				network.Weights[layer].Data[i][j] += eps
-				gradient.Weights[layer].Data[i][j] = (network.Cost(trainIn, trainOut) - oldCost) / eps
-				network.Weights[layer].Data[i][j] = saved
-			}
-		}
-		for i := 0; i < network.Biases[layer].Rows; i++ {
-			for j := 0; j < network.Biases[layer].Cols; j++ {
-				saved = network.Biases[layer].Data[i][j]
-				network.Biases[layer].Data[i][j] += eps
-				gradient.Biases[layer].Data[i][j] = (network.Cost(trainIn, trainOut) - oldCost) / eps
-				network.Biases[layer].Data[i][j] = saved
-			}
-		}
+func (network *Network) Backprop(trainIn Mat, trainOut Mat, rate float64) {
+	if trainIn.Rows != trainOut.Rows {
+		log.Fatal("Error!: Invalid training data")
 	}
-
-	for layer := 0; layer < (network.LayerCount - 1); layer++ {
-		for i := 0; i < network.Weights[layer].Rows; i++ {
-			for j := 0; j < network.Weights[layer].Cols; j++ {
-				network.Weights[layer].Data[i][j] -= rate * gradient.Weights[layer].Data[i][j]
-			}
-		}
-		for i := 0; i < network.Biases[layer].Rows; i++ {
-			for j := 0; j < network.Biases[layer].Cols; j++ {
-				network.Biases[layer].Data[i][j] -= rate * gradient.Biases[layer].Data[i][j]
-			}
-		}
-	}
-
-}
-
-func (network *Network) Backprop(gradient *Network, trainIn Mat, trainOut Mat, rate float64) {
 	sampleCount := trainIn.Rows
-	//TODO: initialise to zero
+	gradientLayout := make([]Layer, network.LayerCount)
+	for layer := 0; layer < network.LayerCount; layer++ {
+		gradientLayout[layer] = Layer{
+			NeuronCount:    network.Layout[layer],
+			ActivationFunc: network.ActivationFunc[layer],
+		}
+	}
+	gradient := NetworkNew(gradientLayout, Zero, Zero)
 
+	for layer := 0; layer < (gradient.LayerCount - 1); layer++ {
+		MatFill(&gradient.Biases[layer], 0)
+		MatFill(&gradient.Weights[layer], 0)
+	}
 	for sample := 0; sample < int(sampleCount); sample++ {
 		for layer := 0; layer < (gradient.LayerCount); layer++ {
+			MatFill(&network.Activation[layer], 0)
 			MatFill(&gradient.Activation[layer], 0)
-		}
-		for layer := 0; layer < (gradient.LayerCount - 1); layer++ {
-			MatFill(&gradient.Biases[layer], 0)
-			MatFill(&gradient.Weights[layer], 0)
 		}
 		network.Forward(trainIn.Row(sample))
 		for i := 0; i < trainOut.Cols; i++ {
-			gradient.Activation[len(gradient.Activation)-1].Data[0][i] = network.Activation[len(gradient.Activation)-1].Data[0][i] - trainOut.Data[sample][i]
+			got := network.Activation[gradient.LayerCount-1].Data[0][i]
+			expected := trainOut.Data[sample][i]
+			gradient.Activation[gradient.LayerCount-1].Data[0][i] = got - expected
 		}
 
 		for layer := (network.LayerCount - 1); layer > 0; layer-- {
@@ -217,7 +183,7 @@ func (network *Network) Backprop(gradient *Network, trainIn Mat, trainOut Mat, r
 			}
 		}
 	}
-	network.Adjust(gradient, rate)
+	network.Adjust(&gradient, rate)
 }
 
 func NetworkPrint(network *Network) {

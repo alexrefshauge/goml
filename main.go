@@ -5,6 +5,7 @@ import (
 	. "goml/braincell"
 	_ "image/png"
 	"math/rand"
+	"time"
 )
 
 var trainData = [][2]int{
@@ -23,7 +24,8 @@ func main() {
 	// var eps float64 = 1e-3
 	// var learningRate float64 = 1e-1
 
-	rand.Seed(69)
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
 
 	// appleTrain64, err := os.Open("./datasets/apple_12.png")
 	// trainingData, err := png.Decode(appleTrain64)
@@ -31,21 +33,31 @@ func main() {
 	// 	log.Fatal("Error!: Failed to read image")
 	// }
 
-	cycles := 100
+	cycles := 500
 	//network := NetworkNew([]int{2, 3, 3})
 
 	//TEST
-	networkXor := NetworkNew([]int{2, 2, 1})
+	networkXor := NetworkNew([]Layer{
+		{NeuronCount: 2, ActivationFunc: Sigmoid},
+		{NeuronCount: 2, ActivationFunc: Sigmoid},
+		{NeuronCount: 1, ActivationFunc: Sigmoid},
+	}, rand.Float64, rand.Float64)
+
 	trainingDataIn := Mat{Rows: 4, Cols: 2, Data: [][]float64{{0, 0}, {1, 0}, {0, 1}, {1, 1}}}
 	trainingDataOut := Mat{Rows: 4, Cols: 1, Data: [][]float64{{0}, {1}, {1}, {0}}}
-
-	gradient := NetworkNewZero(networkXor.Layout)
+	gradientLayout := make([]Layer, networkXor.LayerCount)
+	for layer := 0; layer < (networkXor.LayerCount - 1); layer++ {
+		gradientLayout[layer] = Layer{NeuronCount: networkXor.Layout[layer], ActivationFunc: networkXor.ActivationFunc[layer]}
+	}
 	// networkXor.Backprop(&gradient, trainingDataIn, trainingDataOut, 1)
 
 	for i := 0; i < cycles; i++ {
-		networkXor.Backprop(&gradient, trainingDataIn, trainingDataOut, 0.02)
-		fmt.Println("\t\t", i, "\t", networkXor.Cost(trainingDataIn, trainingDataOut))
+		oldCost := networkXor.Cost(trainingDataIn, trainingDataOut)
+		networkXor.Backprop(trainingDataIn, trainingDataOut, 0.1)
+		newCost := networkXor.Cost(trainingDataIn, trainingDataOut)
+		fmt.Println("\t", i, "\t", newCost, "\t", newCost-oldCost)
 	}
+
 	fmt.Println("0 ^ 0 : ", networkXor.Forward(trainingDataIn.Row(0)).Data[0][0])
 	fmt.Println("1 ^ 0 : ", networkXor.Forward(trainingDataIn.Row(1)).Data[0][0])
 	fmt.Println("0 ^ 1 : ", networkXor.Forward(trainingDataIn.Row(2)).Data[0][0])
