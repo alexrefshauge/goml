@@ -175,16 +175,14 @@ func (network *Network) Adjust(gradient *Network, rate float64) {
 	for layer := 0; layer < (network.LayerCount - 1); layer++ {
 		for i := 0; i < gradient.Weights[layer].Rows; i++ {
 			for j := 0; j < gradient.Weights[layer].Cols; j++ {
-				gradient.Weights[layer].Data[i][j] *= rate * -1
+				network.Weights[layer].Data[i][j] -= gradient.Weights[layer].Data[i][j] * rate
 			}
 		}
 		for i := 0; i < gradient.Biases[layer].Rows; i++ {
 			for j := 0; j < gradient.Biases[layer].Cols; j++ {
-				gradient.Biases[layer].Data[i][j] *= rate * -1
+				network.Biases[layer].Data[i][j] -= gradient.Biases[layer].Data[i][j] * rate
 			}
 		}
-		network.Weights[layer] = MatSum(network.Weights[layer], gradient.Weights[layer])
-		network.Biases[layer] = MatSum(network.Biases[layer], gradient.Biases[layer])
 	}
 }
 
@@ -252,9 +250,9 @@ func (network *Network) Backprop(trainIn Mat, trainOut Mat, rate float64) {
 
 func NetworkPrint(network *Network) {
 	for layer := 0; layer < (network.LayerCount - 1); layer++ {
-		MatPrint(network.Activation[layer], fmt.Sprintf("Activationlayer %d", (layer+1)))
-		MatPrint(network.Weights[layer], fmt.Sprintf("Weightlayer %d", (layer+1)))
-		MatPrint(network.Biases[layer], fmt.Sprintf("Biaslayer %d", (layer+1)))
+		MatPrint(&network.Activation[layer], fmt.Sprintf("Activationlayer %d", (layer+1)))
+		MatPrint(&network.Weights[layer], fmt.Sprintf("Weightlayer %d", (layer+1)))
+		MatPrint(&network.Biases[layer], fmt.Sprintf("Biaslayer %d", (layer+1)))
 	}
-	MatPrint(network.Activation[len(network.Activation)-1], "Output layer")
+	MatPrint(&network.Activation[len(network.Activation)-1], "Output layer")
 }

@@ -13,23 +13,13 @@ import (
 	"time"
 )
 
-var trainData = [][2]int{
-	{0, 0},
-	{1, 2},
-	{2, 4},
-	{3, 6},
-	{4, 8},
-}
-var trainCount = len(trainData)
-
-const eps = 1e-3
-const learningRate float64 = 0.1
+const learningRate float64 = 0.5
 
 func rgbToGrey(r float64, g float64, b float64) float64 {
 	return 0.299*r + 0.587*g + 0.114*b
 }
 
-func saveImage(path string, size int, net Network) {
+func generateImage(path string, size int, net Network) {
 	file, _ := os.Create(path)
 	upLeft := image.Point{0, 0}
 	lowRight := image.Point{size, size}
@@ -61,46 +51,57 @@ func main() {
 	appleTrain64, err := os.Open("./datasets/3.png")
 	resWidth := 32
 	resHeight := 32
-	trainingData, err := png.Decode(appleTrain64)
+	trainingImage, err := png.Decode(appleTrain64)
 	if err != nil {
 		log.Fatal("Error!: Failed to read image")
 	}
 
 	cycles := 50000
 	network := NetworkNew([]Layer{
-		{NeuronCount: 2, ActivationFunc: Sigmoid},
-		{NeuronCount: 16, ActivationFunc: Sigmoid},
-		{NeuronCount: 16, ActivationFunc: Sigmoid},
-		{NeuronCount: 1, ActivationFunc: Sigmoid},
+		{NeuronCount: 2, ActivationFunc: TanH},
+		{NeuronCount: 28, ActivationFunc: ReLU},
+		{NeuronCount: 28, ActivationFunc: ReLU},
+		{NeuronCount: 1, ActivationFunc: TanH},
 	}, func() float64 { return rand.Float64()*0.4 - 0.2 },
 		func() float64 { return rand.Float64()*2 - 1 },
 	)
 
-	trainingDataIn := MatNew(resWidth*resHeight, 2, func() float64 { return 0 })
-	trainingDataOut := MatNew(resWidth*resHeight, 1, func() float64 { return 0 })
+	trainingData := MatNew(resWidth*resHeight, 3, Zero)
+	trainingDataIn := MatNew(resWidth*resHeight, 2, Zero)
+	trainingDataOut := MatNew(resWidth*resHeight, 1, Zero)
 	for y := 0; y < resHeight; y++ {
 		for x := 0; x < resWidth; x++ {
-			trainingDataIn.Data[y*x+x][0] = (float64(x) / float64(resWidth))
-			trainingDataIn.Data[y*x+x][1] = (float64(y) / float64(resHeight))
-
-			pixel := trainingData.At(x, y)
+			pixel := trainingImage.At(x, y)
 			r, g, b, _ := pixel.RGBA()
-			trainingDataOut.Data[y*x+x] = []float64{rgbToGrey(float64(r>>8), float64(g>>8), float64(b>>8)) / 255}
+			xx := float64(x+1) / float64(resWidth)
+			yy := float64(y+1) / float64(resHeight)
+			brightness := rgbToGrey(float64(r>>8), float64(g>>8), float64(b>>8)) / float64(255)
+			trainingData.Data[y*resWidth+x] = []float64{xx, yy, brightness}
 		}
 	}
 
 	for i := 0; i < cycles; i++ {
+		MatRowShuffle(&trainingData)
+		for row := 0; row < trainingData.Rows; row++ {
+			trainingDataIn.Data[row][0] = trainingData.Data[row][0]
+			trainingDataIn.Data[row][1] = trainingData.Data[row][1]
+			trainingDataOut.Data[row][0] = trainingData.Data[row][2]
+		}
+
 		var rate float64 = learningRate
+		if i > 3000 {
+			rate = 0.1
+		}
 		network.Backprop(trainingDataIn, trainingDataOut, rate)
 		fmt.Printf("epoch: %07d rate: %0.02f cost: %.03f \n", i, rate, network.Cost(trainingDataIn, trainingDataOut))
 
 		if i%10 == 0 {
-			saveImage("progress.png", 12, network)
+			generateImage("progress.png", 12, network)
 		}
 		if i%1000 == 0 {
-			saveImage("result.png", 128, network)
+			generateImage("result.png", 128, network)
 		}
 	}
-	saveImage("progress.png", 1024, network)
+	generateImage("progress.png", 1024, network)
 	fmt.Println("seed: ", seed)
 }
