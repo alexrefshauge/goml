@@ -2,6 +2,7 @@ package braincell
 
 import (
 	"fmt"
+	"math/rand"
 )
 
 type Mat struct {
@@ -118,4 +119,18 @@ func MatNew(rows, cols int, fn func() float64) Mat {
 		}
 	}
 	return newMat
+}
+
+func MatRowShuffle(mat *Mat) {
+	for row := 0; row < mat.Rows; row++ {
+		var randRow int = row + (rand.Int() % (mat.Rows - row))
+		if randRow != row {
+			//swap entries
+			for i := 0; i < mat.Cols; i++ {
+				temp := mat.Data[randRow][i]
+				mat.Data[randRow][i] = mat.Data[row][i]
+				mat.Data[row][i] = temp
+			}
+		}
+	}
 }

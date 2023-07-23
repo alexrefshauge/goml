@@ -12,24 +12,86 @@ type Network struct {
 	Activation     []Mat
 	Weights        []Mat
 	Biases         []Mat
-	ActivationFunc []func(float64) float64
+	ActivationFunc []Act
 }
 
 type Layer struct {
 	NeuronCount    int
-	ActivationFunc func(x float64) float64
+	ActivationFunc Act
 }
 
-func Sigmoid(x float64) float64 {
-	return 1.0 / (1.0 + math.Exp(-x))
+type Act int
+
+const (
+	Sigmoid Act = 0
+	ReLU        = 1
+	GELU        = 2
+	TanH        = 3
+)
+const RELU_MIN = 0.01
+
+func activateFn(act Act) func(x float64) float64 {
+	var fn func(x float64) float64 = nil
+	switch act {
+	case Sigmoid:
+		fn = func(x float64) float64 { return 1.0 / (1.0 + math.Exp(-x)) }
+		break
+	case ReLU:
+		fn = func(x float64) float64 {
+			if x > 0 {
+				return x
+			} else {
+				return x * RELU_MIN
+			}
+		}
+		break
+	case GELU:
+		fn = func(x float64) float64 { return 0.5 * x * (1 + math.Erf(x/math.Sqrt(2))) }
+		break
+	case TanH:
+		fn = func(x float64) float64 { return ((math.Exp(x)-math.Exp(-x))/(math.Exp(x)+math.Exp(-x)) + 1) / 2 }
+		break
+	default:
+		log.Fatal("Error!: Invalid activation function")
+	}
+	return fn
 }
 
-func ReLU(x float64) float64 {
-	return math.Max(0.0, x)
+func dActivateFn(act Act) func(x float64) float64 {
+	var fn func(x float64) float64 = nil
+	switch act {
+	case Sigmoid:
+		fn = func(x float64) float64 { return x * (1 - x) }
+		break
+	case ReLU:
+		fn = func(x float64) float64 {
+			if x >= 0 {
+				return 1
+			} else {
+				return RELU_MIN
+			}
+		}
+		break
+	case GELU:
+		fn = func(x float64) float64 {
+			if x >= 0 {
+				return 1
+			} else {
+				return RELU_MIN
+			}
+		}
+		break
+	case TanH:
+		fn = func(x float64) float64 { return 1 - x*x }
+		break
+	default:
+		log.Fatal("Error!: Invalid activation function")
+	}
+	return fn
 }
 
-func GELU(x float64) float64 {
-	return 0.5 * x * (1 + math.Erf(x/math.Sqrt(2)))
+func dTanH(x float64) float64 {
+	return 1 - x*x
 }
 
 func (n Network) validate() {
@@ -47,7 +109,7 @@ func NetworkNew(layers []Layer, biasInitialiser func() float64, weightInitialise
 	layerCount := len(layers)
 	newNetwork := Network{LayerCount: layerCount}
 	newNetwork.Layout = make([]int, layerCount)
-	newNetwork.ActivationFunc = make([]func(float64) float64, layerCount)
+	newNetwork.ActivationFunc = make([]Act, layerCount)
 	newNetwork.Activation = make([]Mat, layerCount)
 	newNetwork.Weights = make([]Mat, layerCount-1)
 	newNetwork.Biases = make([]Mat, layerCount-1)
@@ -68,22 +130,22 @@ func NetworkNew(layers []Layer, biasInitialiser func() float64, weightInitialise
 	return newNetwork
 }
 
-func (m *Network) Forward(a0 Mat) Mat {
+func (network *Network) Forward(a0 Mat) Mat {
 	//TODO:Assert size of a0/input layer
 
-	m.Activation[0] = a0
+	network.Activation[0] = a0
 
-	for layer := 0; layer < (len(m.Activation) - 1); layer++ {
-		a := m.Activation[layer]
-		w := m.Weights[layer]
-		b := m.Biases[layer]
+	for layer := 0; layer < (len(network.Activation) - 1); layer++ {
+		a := network.Activation[layer]
+		w := network.Weights[layer]
+		b := network.Biases[layer]
 
-		m.Activation[layer+1] = MatDot(a, w)
-		m.Activation[layer+1] = MatSum(m.Activation[layer+1], b)
-		MatApply(&m.Activation[layer+1], GELU)
+		network.Activation[layer+1] = MatDot(a, w)
+		network.Activation[layer+1] = MatSum(network.Activation[layer+1], b)
+		MatApply(&network.Activation[layer+1], activateFn(network.ActivationFunc[layer+1]))
 	}
 
-	outputLayer := m.Activation[len(m.Activation)-1]
+	outputLayer := network.Activation[len(network.Activation)-1]
 	return outputLayer
 }
 
@@ -160,12 +222,14 @@ func (network *Network) Backprop(trainIn Mat, trainOut Mat, rate float64) {
 			for j := 0; j < network.Activation[layer].Cols; j++ {
 				var a float64 = network.Activation[layer].Data[0][j]
 				var da float64 = gradient.Activation[layer].Data[0][j]
-				gradient.Biases[layer-1].Data[0][j] += 2 * da * a * (1 - a)
+				var qa float64 = dActivateFn(network.ActivationFunc[layer])(a)
+				//float qa = dactf(a, NN_ACT);
+				gradient.Biases[layer-1].Data[0][j] += 2 * da * qa
 				for k := 0; k < network.Activation[layer-1].Cols; k++ {
 					var pa float64 = network.Activation[layer-1].Data[0][k]
 					var w float64 = network.Weights[layer-1].Data[k][j]
-					gradient.Weights[layer-1].Data[k][j] += 2 * da * a * (1 - a) * pa
-					gradient.Activation[layer-1].Data[0][k] += 2 * da * a * (1 - a) * w
+					gradient.Weights[layer-1].Data[k][j] += 2 * da * qa * pa
+					gradient.Activation[layer-1].Data[0][k] += 2 * da * qa * w
 				}
 			}
 		}
